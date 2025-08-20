@@ -19,14 +19,14 @@ locals {
   # Determine if this is a CloudFront or Regional deployment
   is_cloudfront = var.scope == "CLOUDFRONT"
   is_regional   = var.scope == "REGIONAL"
-  
+
   # Set appropriate aggregate key type based on scope
   rate_limit_aggregate_key = local.is_regional ? "FORWARDED_IP" : "IP"
-  
+
   # Generate unique names if not provided
   rule_group_name = var.rule_group_name != null ? var.rule_group_name : "SecurityBaselineRuleGroup"
   web_acl_name    = var.web_acl_name != null ? var.web_acl_name : "${local.is_cloudfront ? "CloudFront" : "Regional"}SecurityBaselineWebACL"
-  
+
   # Log group name based on scope
   log_group_name = "aws-waf-logs-${local.is_cloudfront ? "global" : "regional"}-waf-acl-logs-${random_id.log_suffix.hex}"
 }
@@ -66,8 +66,8 @@ resource "aws_wafv2_rule_group" "security_baseline" {
 
     statement {
       rate_based_statement {
-        limit              = var.uri_country_rule_limit
-        aggregate_key_type = local.rate_limit_aggregate_key
+        limit                 = var.uri_country_rule_limit
+        aggregate_key_type    = local.rate_limit_aggregate_key
         evaluation_window_sec = 300
 
         dynamic "forwarded_ip_config" {
@@ -121,8 +121,8 @@ resource "aws_wafv2_rule_group" "security_baseline" {
 
     statement {
       rate_based_statement {
-        limit              = var.rate_based_rule_limit
-        aggregate_key_type = local.rate_limit_aggregate_key
+        limit                 = var.rate_based_rule_limit
+        aggregate_key_type    = local.rate_limit_aggregate_key
         evaluation_window_sec = 300
 
         dynamic "forwarded_ip_config" {

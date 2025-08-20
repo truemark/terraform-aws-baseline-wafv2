@@ -22,18 +22,18 @@ module "cloudfront_waf" {
   source = "../../"
 
   # Required parameters
-  scope                    = "CLOUDFRONT"
-  country_codes           = ["CN", "RU", "KP", "IR"]
-  search_string           = "/api/login"
-  uri_country_rule_limit  = 100
-  rate_based_rule_limit   = 200
+  scope                  = "CLOUDFRONT"
+  country_codes          = ["CN", "RU", "KP", "IR"]
+  search_string          = "/api/login"
+  uri_country_rule_limit = 100
+  rate_based_rule_limit  = 200
 
   # Optional parameters
-  mode                    = "count"  # Start with count mode for testing
-  web_acl_name           = "CloudFrontSecurityWAF"
-  rule_group_name        = "CloudFrontSecurityRules"
-  uri_country_action     = "block"
-  log_retention_days     = 30
+  mode               = "count" # Start with count mode for testing
+  web_acl_name       = "CloudFrontSecurityWAF"
+  rule_group_name    = "CloudFrontSecurityRules"
+  uri_country_action = "block"
+  log_retention_days = 30
 
   tags = {
     Environment = "production"

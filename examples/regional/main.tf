@@ -22,18 +22,18 @@ module "regional_waf" {
   source = "../../"
 
   # Required parameters
-  scope                    = "REGIONAL"
-  country_codes           = ["CN", "RU", "KP"]
-  search_string           = "/auth/login"
-  uri_country_rule_limit  = 150
-  rate_based_rule_limit   = 300
+  scope                  = "REGIONAL"
+  country_codes          = ["CN", "RU", "KP"]
+  search_string          = "/auth/login"
+  uri_country_rule_limit = 150
+  rate_based_rule_limit  = 300
 
   # Optional parameters
-  mode                    = "count"  # Start with count mode for testing
-  web_acl_name           = "RegionalSecurityWAF"
-  rule_group_name        = "RegionalSecurityRules"
-  uri_country_action     = "count"
-  log_retention_days     = 365
+  mode               = "count" # Start with count mode for testing
+  web_acl_name       = "RegionalSecurityWAF"
+  rule_group_name    = "RegionalSecurityRules"
+  uri_country_action = "count"
+  log_retention_days = 365
 
   tags = {
     Environment = "production"
