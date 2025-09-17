@@ -8,7 +8,8 @@ This Terraform module creates a baseline AWS WAF v2 configuration that provides 
 - **Custom Rate Limiting**: Configurable rate limiting rules for login endpoints and country-based restrictions
 - **AWS Managed Rules**: Includes multiple AWS managed rule sets for comprehensive protection
 - **Geo-blocking**: Country-based blocking with customizable country codes
-- **Comprehensive Logging**: CloudWatch logging with configurable retention periods
+- **Comprehensive Logging**: CloudWatch logging with configurable retention periods and optional encryption
+- **NIST 800-171 Compliance**: Support for log encryption using AWS KMS for compliance requirements
 - **Flexible Configuration**: Count or active mode for all rules
 
 ## Security Rules Included
@@ -93,6 +94,52 @@ resource "aws_wafv2_web_acl_association" "alb" {
 }
 ```
 
+### NIST 800-171 Compliant Configuration with Encryption
+
+```hcl
+# Create a KMS key for log encryption
+resource "aws_kms_key" "waf_logs" {
+  description             = "KMS key for WAF log encryption"
+  deletion_window_in_days = 7
+  
+  tags = {
+    Name        = "waf-logs-encryption-key"
+    Environment = "production"
+    Compliance  = "NIST-800-171"
+  }
+}
+
+resource "aws_kms_alias" "waf_logs" {
+  name          = "alias/waf-logs-encryption"
+  target_key_id = aws_kms_key.waf_logs.key_id
+}
+
+module "compliant_waf" {
+  source = "path/to/this/module"
+
+  scope                    = "REGIONAL"
+  mode                     = "active"
+  web_acl_name            = "NIST-Compliant-WAF"
+  
+  # Custom rule configuration
+  search_string           = "/api/login"
+  country_codes          = ["CN", "RU", "KP"]
+  uri_country_rule_limit = 100
+  uri_country_action     = "block"
+  rate_based_rule_limit  = 200
+  
+  # Logging configuration with encryption for NIST 800-171 compliance
+  log_retention_days = 365
+  kms_key_id        = aws_kms_key.waf_logs.arn
+  
+  tags = {
+    Environment = "production"
+    Compliance  = "NIST-800-171"
+    Project     = "secure-web-app"
+  }
+}
+```
+
 ### Minimal Configuration
 
 ```hcl
@@ -143,6 +190,7 @@ module "simple_waf" {
 | rule_group_name | The name of the rule group | `string` | `null` | no |
 | log_retention_days | The number of days log events are kept in CloudWatch Logs | `number` | `365` | no |
 | uri_country_action | The action to take on the URI country rule | `string` | `"count"` | no |
+| kms_key_id | The ARN of the KMS Key to use when encrypting log data. If not provided, encryption is disabled | `string` | `null` | no |
 | tags | A map of tags to assign to the resources | `map(string)` | `{}` | no |
 
 ## Outputs
