@@ -87,6 +87,12 @@ variable "rate_based_rule_limit" {
   }
 }
 
+variable "kms_key_id" {
+  description = "The ARN of the KMS Key to use when encrypting log data. If not provided, encryption is disabled."
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   description = "A map of tags to assign to the resources."
   type        = map(string)

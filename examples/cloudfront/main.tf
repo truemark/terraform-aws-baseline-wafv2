@@ -17,6 +17,23 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Optional: KMS key for log encryption (uncomment for NIST 800-171 compliance)
+# resource "aws_kms_key" "waf_logs" {
+#   description             = "KMS key for WAF log encryption"
+#   deletion_window_in_days = 7
+#
+#   tags = {
+#     Name        = "cloudfront-waf-logs-encryption-key"
+#     Environment = "production"
+#     Compliance  = "NIST-800-171"
+#   }
+# }
+#
+# resource "aws_kms_alias" "waf_logs" {
+#   name          = "alias/cloudfront-waf-logs-encryption"
+#   target_key_id = aws_kms_key.waf_logs.key_id
+# }
+
 # CloudFront WAF Module
 module "cloudfront_waf" {
   source = "../../"
@@ -34,6 +51,9 @@ module "cloudfront_waf" {
   rule_group_name    = "CloudFrontSecurityRules"
   uri_country_action = "block"
   log_retention_days = 30
+
+  # Uncomment the line below to enable log encryption (requires KMS key above)
+  # kms_key_id = aws_kms_key.waf_logs.arn
 
   tags = {
     Environment = "production"
