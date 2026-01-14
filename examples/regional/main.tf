@@ -52,6 +52,27 @@ module "regional_waf" {
   uri_country_action = "count"
   log_retention_days = 365
 
+  # Optional: IP Whitelist - IPs that bypass all WAF rules
+  # Uncomment and add your trusted IPs for testing/monitoring
+  # ip_whitelist = [
+  #   "203.0.113.0/24",    # Example: Internal network
+  #   "198.51.100.5/32",   # Example: CI/CD server
+  #   "192.0.2.10/32",     # Example: Monitoring system
+  # ]
+
+  # Optional: Exclude specific rules that cause false positives
+  # excluded_rules = {
+  #   "AWSManagedRulesCommonRuleSet" = ["SizeRestrictions_BODY", "GenericRFI_BODY"]
+  #   "AWSManagedRulesKnownBadInputsRuleSet" = ["JavaDeserializationRCE"]
+  # }
+
+  # Optional: Override specific rule actions (e.g., change block to count)
+  # rule_action_overrides = {
+  #   "AWSManagedRulesCommonRuleSet" = {
+  #     "NoUserAgent_HEADER" = "count"
+  #   }
+  # }
+
   # Uncomment the line below to enable log encryption (requires KMS key above)
   # kms_key_id = aws_kms_key.waf_logs.arn
 

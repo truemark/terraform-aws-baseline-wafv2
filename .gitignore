@@ -63,3 +63,6 @@ pids
 # Temporary folders
 tmp/
 temp/
+
+.terraform
+terraform.tfstate

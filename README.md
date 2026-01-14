@@ -5,6 +5,7 @@ This Terraform module creates a baseline AWS WAF v2 configuration that provides 
 ## Features
 
 - **Dual Scope Support**: Works with both CloudFront (CLOUDFRONT) and Regional (REGIONAL) deployments
+- **IP Whitelisting**: Optional IP whitelist to allow trusted IPs to bypass all WAF rules
 - **Custom Rate Limiting**: Configurable rate limiting rules for login endpoints and country-based restrictions
 - **AWS Managed Rules**: Includes multiple AWS managed rule sets for comprehensive protection
 - **Geo-blocking**: Country-based blocking with customizable country codes
@@ -154,6 +155,87 @@ module "simple_waf" {
 }
 ```
 
+### WAF with IP Whitelisting (Count Mode + Trusted IPs)
+
+```hcl
+module "waf_with_whitelist" {
+  source = "path/to/this/module"
+
+  scope                  = "REGIONAL"
+  mode                   = "count"  # Test with count mode
+  web_acl_name          = "WAF-With-Whitelist"
+  
+  # Custom rule configuration
+  search_string          = "/api/login"
+  country_codes          = ["CN", "RU", "KP"]
+  uri_country_rule_limit = 150
+  rate_based_rule_limit  = 300
+  
+  # IP Whitelist - these IPs bypass all WAF rules
+  ip_whitelist = [
+    "203.0.113.0/24",    # Internal network
+    "198.51.100.5/32",   # CI/CD server
+    "192.0.2.10/32",     # Monitoring system
+  ]
+  
+  tags = {
+    Environment = "staging"
+    Project     = "api-security"
+  }
+}
+
+# Associate with Application Load Balancer
+resource "aws_wafv2_web_acl_association" "alb" {
+  resource_arn = aws_lb.example.arn
+  web_acl_arn  = module.waf_with_whitelist.web_acl_arn
+}
+```
+
+### Advanced: Rule Exclusions and Overrides
+
+```hcl
+module "waf_with_exceptions" {
+  source = "path/to/this/module"
+
+  scope                  = "REGIONAL"
+  mode                   = "active"
+  web_acl_name          = "WAF-With-Exceptions"
+  
+  # Basic configuration
+  search_string          = "/api/login"
+  country_codes          = ["CN", "RU", "KP"]
+  uri_country_rule_limit = 150
+  rate_based_rule_limit  = 300
+  
+  # Exclude specific rules that cause false positives
+  excluded_rules = {
+    "AWSManagedRulesCommonRuleSet" = [
+      "SizeRestrictions_BODY",  # Exclude if you have large request bodies
+      "GenericRFI_BODY"         # Exclude if causing false positives
+    ]
+    "AWSManagedRulesKnownBadInputsRuleSet" = [
+      "JavaDeserializationRCE"  # Exclude if not using Java
+    ]
+  }
+  
+  # Override specific rule actions (change from block to count for testing)
+  rule_action_overrides = {
+    "AWSManagedRulesCommonRuleSet" = {
+      "NoUserAgent_HEADER"      = "count"  # Count instead of block
+      "SizeRestrictions_BODY"   = "count"  # Count instead of block
+    }
+    "AWSManagedRulesAnonymousIpList" = {
+      "AnonymousIPList"         = "count"  # Count anonymous IPs
+    }
+  }
+  
+  tags = {
+    Environment = "production"
+    Project     = "api-security"
+  }
+}
+```
+
 ## Requirements
 
 | Name | Version |
@@ -172,6 +254,7 @@ module "simple_waf" {
 
 - `aws_wafv2_rule_group.security_baseline` - Custom rule group with rate limiting rules
 - `aws_wafv2_web_acl.security_baseline` - Main WebACL with all rules
+- `aws_wafv2_ip_set.whitelist` - IP set for whitelisted IPs (conditionally created)
 - `aws_cloudwatch_log_group.waf_log_group` - CloudWatch log group for WAF logs
 - `aws_wafv2_web_acl_logging_configuration.security_baseline` - Logging configuration
 - `random_id.log_suffix` - Random suffix for unique log group names
@@ -191,6 +274,10 @@ module "simple_waf" {
 | log_retention_days | The number of days log events are kept in CloudWatch Logs | `number` | `365` | no |
 | uri_country_action | The action to take on the URI country rule | `string` | `"count"` | no |
 | kms_key_id | The ARN of the KMS Key to use when encrypting log data. If not provided, encryption is disabled | `string` | `null` | no |
+| ip_whitelist | List of IP addresses or CIDR blocks to whitelist (bypass all WAF rules) | `list(string)` | `[]` | no |
+| ip_whitelist_name | The name of the IP whitelist set | `string` | `null` | no |
+| excluded_rules | Map of managed rule group names to lists of rule names to exclude | `map(list(string))` | `{}` | no |
+| rule_action_overrides | Map of managed rule group names to maps of rule names and their override actions | `map(map(string))` | `{}` | no |
 | tags | A map of tags to assign to the resources | `map(string)` | `{}` | no |
 
 ## Outputs
@@ -207,6 +294,36 @@ module "simple_waf" {
 | log_group_name | The name of the CloudWatch Log Group for WAF logs |
 | scope | The scope of the WAF deployment (CLOUDFRONT or REGIONAL) |
 | mode | The mode of the WAF rules (count or active) |
+| ip_whitelist_set_arn | The ARN of the IP whitelist IP set (if enabled) |
+| ip_whitelist_set_id | The ID of the IP whitelist IP set (if enabled) |
+| ip_whitelist_enabled | Whether IP whitelisting is enabled |
+
+## Exception Patterns
+
+This module supports three levels of exception handling:
+
+### 1. IP Whitelisting (Bypass All Rules)
+Use `ip_whitelist` to allow specific IPs to bypass **all** WAF rules. This is useful for:
+- Internal networks
+- CI/CD systems
+- Monitoring tools
+- Known partners
+
+**Priority**: Highest (0) - evaluated first
+
+### 2. Rule Exclusions (Remove Specific Rules)
+Use `excluded_rules` to completely exclude specific rules from AWS Managed Rule Groups. This permanently removes the rule from evaluation. Use when:
+- A rule causes consistent false positives for your application
+- A rule is not applicable to your technology stack
+- You've verified the rule is not needed for your security posture
+
+### 3. Rule Action Overrides (Change Rule Behavior)
+Use `rule_action_overrides` to change how specific rules behave (e.g., block → count, count → block). Use when:
+- Testing rules before fully enabling them
+- Temporarily disabling problematic rules while investigating
+- Fine-tuning rule sensitivity
+
+**Best Practice**: Start with count mode globally (`mode = "count"`), then use rule_action_overrides to selectively enable blocking for specific rules.
 
 ## Key Differences Between Scopes
 

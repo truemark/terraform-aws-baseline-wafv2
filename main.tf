@@ -29,12 +29,27 @@ locals {
 
   # Log group name based on scope
   log_group_name = "aws-waf-logs-${local.is_cloudfront ? "global" : "regional"}-waf-acl-logs-${random_id.log_suffix.hex}"
+
+  # IP whitelist configuration
+  ip_whitelist_enabled = length(var.ip_whitelist) > 0
+  ip_whitelist_name    = var.ip_whitelist_name != null ? var.ip_whitelist_name : "${local.web_acl_name}-IPWhitelist"
 }
 
 # Generate random suffix for log group names to ensure uniqueness
 resource "random_id" "log_suffix" {
   byte_length = 4
 }
+
+# IP Whitelist IP Set (only created if IP whitelist is provided)
+resource "aws_wafv2_ip_set" "whitelist" {
+  count              = local.ip_whitelist_enabled ? 1 : 0
+  name               = local.ip_whitelist_name
+  scope              = var.scope
+  ip_address_version = "IPV4"
+  addresses          = var.ip_whitelist
+  tags               = var.tags
+}
+
 
 # Custom Rule Group
 resource "aws_wafv2_rule_group" "security_baseline" {
@@ -174,10 +189,35 @@ resource "aws_wafv2_web_acl" "security_baseline" {
     sampled_requests_enabled   = true
   }
 
+  # IP Whitelist Rule (highest priority - allows whitelisted IPs to bypass all WAF rules)
+  dynamic "rule" {
+    for_each = local.ip_whitelist_enabled ? [1] : []
+    content {
+      name     = "IPWhitelistAllowRule"
+      priority = 0
+
+      action {
+        allow {}
+      }
+
+      statement {
+        ip_set_reference_statement {
+          arn = aws_wafv2_ip_set.whitelist[0].arn
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "IPWhitelistAllowRuleMetric"
+        sampled_requests_enabled   = true
+      }
+    }
+  }
+
   # AWS Managed Rules - Common Rule Set
   rule {
     name     = "AWS-AWSManagedRulesCommonRuleSet"
-    priority = 0
+    priority = local.ip_whitelist_enabled ? 1 : 0
 
     override_action {
       dynamic "none" {
@@ -207,7 +247,7 @@ resource "aws_wafv2_web_acl" "security_baseline" {
   # Custom Security Baseline Rule Group
   rule {
     name     = "SecurityBaselineRuleGroup"
-    priority = 1
+    priority = local.ip_whitelist_enabled ? 2 : 1
 
     override_action {
       dynamic "none" {
@@ -236,7 +276,7 @@ resource "aws_wafv2_web_acl" "security_baseline" {
   # AWS Managed Rules - Known Bad Inputs Rule Set
   rule {
     name     = "AWS-AWSManagedRulesKnownBadInputsRuleSet"
-    priority = 2
+    priority = local.ip_whitelist_enabled ? 3 : 2
 
     override_action {
       dynamic "none" {
@@ -266,7 +306,7 @@ resource "aws_wafv2_web_acl" "security_baseline" {
   # AWS Managed Rules - Anonymous IP List
   rule {
     name     = "AWS-AWSManagedRulesAnonymousIpList"
-    priority = 3
+    priority = local.ip_whitelist_enabled ? 4 : 3
 
     override_action {
       dynamic "none" {
@@ -304,7 +344,7 @@ resource "aws_wafv2_web_acl" "security_baseline" {
   # AWS Managed Rules - Amazon IP Reputation List
   rule {
     name     = "AWS-AWSManagedRulesAmazonIpReputationList"
-    priority = 4
+    priority = local.ip_whitelist_enabled ? 5 : 4
 
     override_action {
       dynamic "none" {
