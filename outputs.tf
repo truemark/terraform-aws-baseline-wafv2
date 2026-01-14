@@ -47,3 +47,18 @@ output "mode" {
   description = "The mode of the WAF rules (count or active)"
   value       = var.mode
 }
+
+output "ip_whitelist_set_arn" {
+  description = "The ARN of the IP whitelist IP set (if enabled)"
+  value       = local.ip_whitelist_enabled ? aws_wafv2_ip_set.whitelist[0].arn : null
+}
+
+output "ip_whitelist_set_id" {
+  description = "The ID of the IP whitelist IP set (if enabled)"
+  value       = local.ip_whitelist_enabled ? aws_wafv2_ip_set.whitelist[0].id : null
+}
+
+output "ip_whitelist_enabled" {
+  description = "Whether IP whitelisting is enabled"
+  value       = local.ip_whitelist_enabled
+}

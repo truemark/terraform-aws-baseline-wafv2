@@ -98,3 +98,56 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "ip_whitelist" {
+  description = "List of IP addresses or CIDR blocks to whitelist (allow all traffic from these IPs, bypassing all WAF rules). Leave empty to disable IP whitelisting."
+  type        = list(string)
+  default     = []
+  validation {
+    condition = alltrue([
+      for cidr in var.ip_whitelist : can(cidrhost(cidr, 0))
+    ])
+    error_message = "All IP whitelist entries must be valid CIDR blocks (e.g., '203.0.113.0/24' or '203.0.113.5/32')."
+  }
+}
+
+variable "ip_whitelist_name" {
+  description = "The name of the IP whitelist set. If not provided, a default name will be generated."
+  type        = string
+  default     = null
+}
+
+variable "excluded_rules" {
+  description = "Map of managed rule group names to lists of rule names to exclude. Use this to exclude specific rules from AWS Managed Rule Groups."
+  type        = map(list(string))
+  default     = {}
+
+  # Example:
+  # excluded_rules = {
+  #   "AWSManagedRulesCommonRuleSet" = ["SizeRestrictions_BODY", "GenericRFI_BODY"]
+  #   "AWSManagedRulesKnownBadInputsRuleSet" = ["JavaDeserializationRCE"]
+  # }
+}
+
+variable "rule_action_overrides" {
+  description = "Map of managed rule group names to maps of rule names and their override actions. Use this to change specific rule actions (e.g., block to count)."
+  type        = map(map(string))
+  default     = {}
+
+  # Example:
+  # rule_action_overrides = {
+  #   "AWSManagedRulesCommonRuleSet" = {
+  #     "NoUserAgent_HEADER" = "count"
+  #     "SizeRestrictions_BODY" = "count"
+  #   }
+  #   "AWSManagedRulesAnonymousIpList" = {
+  #     "AnonymousIPList" = "count"
+  #   }
+  # }
+}
+
+variable "scope_down_statement_enabled" {
+  description = "Enable scope down statements for managed rule groups to apply rules only to specific request patterns"
+  type        = bool
+  default     = false
+}
